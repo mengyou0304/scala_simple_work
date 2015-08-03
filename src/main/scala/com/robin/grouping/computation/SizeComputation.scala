@@ -60,10 +60,12 @@ class SizeComputation(newAddedHDFSSizeURL: String, topicNum: Int, boltNum: Int) 
 
 object SizeComputation extends App {
   val topicInfos=new TopicDescription("/Application/nla/log_pick/conf/test/testfile")
+  val map=topicInfos.readFromFile();
+
   val sc = new SizeComputation("/Application/nla/log_pick/conf/test/size.out", 300, 100)
   val boundaries=sc.satasticSizeInfo;
-  if(!topicInfos.topicMapping.isEmpty)
-    sc.rebalance(topicInfos.topicMapping)
+//  if(!topicInfos.topicMapping.isEmpty)
+//    sc.rebalance(topicInfos.topicMapping)
 
 
 
