@@ -1,19 +1,64 @@
 package com.robin.grouping.computation
 
-import com.robin.grouping.TopicDescription
+import com.robin.grouping.model.BasicSlot
 
 import scala.collection.mutable.HashMap
 import scala.io.Source
 
 /**
+ *
+ * c: Channel
+ * s/b: Slot/Blot
+ * num: boundary based batch
+ *
+ *
+ *  c1 c2 c3       c4 c5 c6 c7
+ *  |     |        |        |
+ *  +-----+        +--------+
+ *    s1              s2
+ *    |               |
+ *    +---------------+
+ *          b1
+ *
+ *  ================================
+ *  s1   s2 s3      s4 s5 s6 s7 s8
+ *  |        |      |            |
+ *  +--------+      +------------+
+ *  v1 num1  v2     v1   num2    v2
+ *
+ * So:
+ *  v1,v2,v3,v4: Boundaries
+ *  Num1,Num2  : slotNums in Batch
+ *   c1,c2,c3->s1  :Slot
+ *   s1,s2->b1     :Bolt
+ *  How to spread s1~s3 into Num1: SlotSpreadingAlgorithm
+ *  How to spread s1~s8 into Num1,Num2,Num3 : AssignmentAlgorithm
+ *
  * Created by robinmac on 15-7-30.
  */
 class SizeComputation(newAddedHDFSSizeURL: String, topicNum: Int, boltNum: Int) {
 
   val readHDFSSize =
-    addAddtionalHDFSFile(_:HashMap[String,Long], newAddedHDFSSizeURL)
+    addAddtionalHDFSFile(_: HashMap[String, Long], newAddedHDFSSizeURL)
 
-  def rebalance(oldMap:HashMap[String,Long]) = {
+  def rebalance(oldMap: HashMap[String, Long]) = {
+
+
+  }
+
+  /**
+   * Determine the slotnums for each boundary:
+   *
+   *
+   * @param boundaries
+   * @param infomap
+   * @return
+   */
+  def assignSlotNums(boundaries: Array[Long],infomap:HashMap[String,Long]):Array[Long]={
+
+  }
+  def generateSlot(boundaries: Array[Long],infomap:HashMap[String,Long]):Unit={
+    val slotnums=assignSlotNums(boundaries,infomap)
 
 
   }
@@ -59,17 +104,16 @@ class SizeComputation(newAddedHDFSSizeURL: String, topicNum: Int, boltNum: Int) 
 }
 
 object SizeComputation extends App {
-  val topicInfos=new TopicDescription("/Application/nla/log_pick/conf/test/testfile")
-  val map=topicInfos.readFromFile();
+  val topicInfos = new TopicDescription("/Application/nla/log_pick/conf/test/testfile")
+  val map = topicInfos.readFromFile();
 
   val sc = new SizeComputation("/Application/nla/log_pick/conf/test/size.out", 300, 100)
-  val boundaries=sc.satasticSizeInfo;
-//  if(!topicInfos.topicMapping.isEmpty)
-//    sc.rebalance(topicInfos.topicMapping)
+  val sizeMap = sc.readHDFSSize(new HashMap[String, Long])
 
 
-
-
+  val boundaries = sc.satasticSizeInfo;
+  //  if(!topicInfos.topicMapping.isEmpty)
+  //    sc.rebalance(topicInfos.topicMapping)
 
 
 }

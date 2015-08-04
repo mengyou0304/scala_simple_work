@@ -1,6 +1,8 @@
-package com.robin.grouping
+package com.robin.grouping.computation
 
 import java.io.PrintWriter
+
+import com.robin.grouping.model.BasicSlot
 
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 import scala.io.Source
@@ -11,7 +13,7 @@ import scala.io.Source
 class TopicDescription(url: String) extends FileDesription(url: String, ".topic") {
 }
 
-class GroupingDescription(url: String) extends FileDesription(url: String, ".group") {
+class BoltDescription(url: String) extends FileDesription(url: String, ".group") {
 }
 
 class FileDesription(url: String, prefix: String) {
@@ -31,19 +33,20 @@ class FileDesription(url: String, prefix: String) {
     out.close()
   }
 
-  def transformToSlotMap(map: HashMap[String, Long]): HashMap[Long, ArrayBuffer[String]] = {
-    val res = new HashMap[Long, ArrayBuffer[String]]
+  def transformToSlotMap(map: HashMap[String, Long]): BasicSlot = {
+    val slot=new BasicSlot;
+    val res = slot.map
     map.foreach(v => {
       if (!res.contains(v._2))
         res(v._2) = new ArrayBuffer[String]
       res(v._2) += v._1
     })
-    res
+    slot
   }
 
-  def transformToTopicMap(map: HashMap[Long, ArrayBuffer[String]]): HashMap[String, Long] = {
+  def transformToTopicMap(slot:BasicSlot): HashMap[String, Long] = {
     val res = new HashMap[String, Long]
-    map.foreach(v => {
+    slot.map.foreach(v => {
       v._2.foreach(k => {
         res(k) = v._1.toLong
       })
