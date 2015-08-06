@@ -1,8 +1,6 @@
 package com.robin.grouping.computation
 
-import java.io.PrintWriter
-
-import com.robin.grouping.model.BasicSlot
+import kafka.utils.Logging
 
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 import scala.io.Source
@@ -16,7 +14,7 @@ class TopicDescription(url: String) extends FileDesription(url: String, ".topic"
 class BoltDescription(url: String) extends FileDesription(url: String, ".group") {
 }
 
-class FileDesription(url: String, prefix: String) {
+class FileDesription(url: String, prefix: String) extends Logging{
 
   def readFromFile(fileurl: String = url): HashMap[String, Long] = {
     val map = new HashMap[String, Long]
@@ -27,32 +25,7 @@ class FileDesription(url: String, prefix: String) {
     map
   }
 
-  def writeToFile(fileurl: String = url, map: HashMap[String, Long]): Unit = {
-    val out = new PrintWriter(fileurl + prefix)
-    map.foreach(v => out.println(v._1 + "=" + v._2))
-    out.close()
-  }
 
-  def transformToSlotMap(map: HashMap[String, Long]): BasicSlot = {
-    val slot=new BasicSlot;
-    val res = slot.map
-    map.foreach(v => {
-      if (!res.contains(v._2))
-        res(v._2) = new ArrayBuffer[String]
-      res(v._2) += v._1
-    })
-    slot
-  }
-
-  def transformToTopicMap(slot:BasicSlot): HashMap[String, Long] = {
-    val res = new HashMap[String, Long]
-    slot.map.foreach(v => {
-      v._2.foreach(k => {
-        res(k) = v._1.toLong
-      })
-    })
-    res
-  }
 
   /**
    * The method that add a new channel with long.size of data per day.
@@ -67,7 +40,7 @@ class FileDesription(url: String, prefix: String) {
 
 }
 
-object TopicDescription extends App {
-  val m = new TopicDescription("/Application/nla/log_pick/conf/test/testfile")
-  val map = m.transformToSlotMap(m.readFromFile())
-}
+//object TopicDescription extends App {
+//  val m = new TopicDescription("/Application/nla/log_pick/conf/test/testfile")
+////  val map = m.transformToSlotMap(m.readFromFile())
+//}

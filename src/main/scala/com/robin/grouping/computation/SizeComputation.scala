@@ -1,8 +1,11 @@
 package com.robin.grouping.computation
 
-import com.robin.grouping.model.BasicSlot
+import java.io.PrintWriter
 
-import scala.collection.mutable.HashMap
+import com.robin.grouping.model.{BasicSlot, Batch}
+import kafka.utils.Logging
+
+import scala.collection.mutable.{ArrayBuffer, HashMap}
 import scala.io.Source
 
 /**
@@ -21,6 +24,7 @@ import scala.io.Source
  *          b1
  *
  *  ================================
+ *
  *  s1   s2 s3      s4 s5 s6 s7 s8
  *  |        |      |            |
  *  +--------+      +------------+
@@ -36,38 +40,78 @@ import scala.io.Source
  *
  * Created by robinmac on 15-7-30.
  */
-class SizeComputation(newAddedHDFSSizeURL: String, topicNum: Int, boltNum: Int) {
+class SizeComputation(newAddedHDFSSizeURL: String, topicNum: Int, boltNum: Int) extends Logging {
 
-  val readHDFSSize =
-    addAddtionalHDFSFile(_: HashMap[String, Long], newAddedHDFSSizeURL)
 
   def rebalance(oldMap: HashMap[String, Long]) = {
 
 
   }
+  val readHDFSSize =
+    addAddtionalHDFSFile(_: HashMap[String, Long], newAddedHDFSSizeURL)
+
 
   /**
-   * Determine the slotnums for each boundary:
-   *
+   * Determine the slotSums for each boundary:
    *
    * @param boundaries
    * @param infomap
    * @return
    */
   def assignSlotNums(boundaries: Array[Long],infomap:HashMap[String,Long]):Array[Long]={
-
+   Array(topicNum/6,topicNum*2/3,topicNum/6)
   }
-  def generateSlot(boundaries: Array[Long],infomap:HashMap[String,Long]):Unit={
-    val slotnums=assignSlotNums(boundaries,infomap)
+
+  /**
+   * Determine the boundaries of the batches, from here, we directly point out the
+   * precise value of each boundary.
+   * @param infomap
+   * @return
+   */
+  def assignBoundaries(infomap:HashMap[String,Long]): Array[Long] =
+    Array(Integer.MAX_VALUE, 200000, 1000, -1)
 
 
+  def startAssignment(infomap:HashMap[String,Long]):ArrayBuffer[(String,Long)]={
+    //boundaries of each batch
+    val bounds = assignBoundaries(infomap)
+    // nums of each batch
+    val slotnums=assignSlotNums(bounds,infomap)
+    // All batches
+    val batchlist=new ArrayBuffer[Batch]
+    // sorted channels
+    var starter=0l
+    for(i <-1 to bounds.length-1){
+      val batchinfo=infomap.toList.filter(v=>{
+        v._2>bounds(i)&&v._2<=bounds(i-1)
+      })
+      batchlist+=new Batch(batchinfo,slotnums(i-1),starter)
+      starter+=slotnums(i-1)
+    }
+    val slotList=new ArrayBuffer[BasicSlot]
+    batchlist.foreach(v=>
+      slotList.appendAll(v.assignSlotsInBatchAndGet()))
+
+    //put them in to one buffer and print them out
+    val mappinglist=new ArrayBuffer[(String,Long)]
+    slotList.foreach(slot=>mappinglist.appendAll(slot.transformToTopicMap()))
+    //    mappinglist.foreach(v=>println(v._1+"="+v._2))
+    mappinglist
+  }
+
+  def writeToFile(map: Iterable[(String, Long)],fileurl: String): Unit = {
+    val out = new PrintWriter(fileurl )
+    map.foreach(v => out.println(v._1 + "=" + v._2))
+    out.close()
+    logger.info("Finish writing configureations into "+fileurl )
   }
 
   def satasticSizeInfo: Array[Long] = {
+    logger.debug("Starting Staging-based satastic")
     val volums = Array(0l, 0l, 0l, 0l)
     val sizes = Array(0, 0, 0, 0)
     val dataSizeMap = readHDFSSize(new HashMap[String, Long])
-    val bounds = Array(Integer.MAX_VALUE, dataSizeMap.values.sum / dataSizeMap.size, 200, -1)
+    val bounds = assignBoundaries(dataSizeMap)
     for (i <- 1 to bounds.length - 1)
       sizes(i) = dataSizeMap.toList.filter(
         v => v._2 match {
@@ -75,15 +119,23 @@ class SizeComputation(newAddedHDFSSizeURL: String, topicNum: Int, boltNum: Int) 
           case _ => false
         }
       ).map(v => {
-        volums(i) += v._2;
+        volums(i) += v._2
       }
         ).size
-    println("\nAll Channel Size: " + dataSizeMap.size)
+    logger.info("All Channel Size: " + dataSizeMap.size)
     for (i <- 1 to bounds.length - 1)
-      println("\n[" + bounds(i - 1) + "~~" + bounds(i) + "]Channel Num:" + sizes(i) + "  ChannelSize:" + volums(i))
+      logger.info("[" + bounds(i - 1) + "~~" + bounds(i) + "]Channel Num:" + sizes(i) + "  ChannelSize:" + volums(i))
     bounds
   }
 
+  /**
+   * Read DataSize infos from hdfsoutput file.
+   * It also support more than one file, which would add the size of them together by key
+   *
+   * @param dataSizeMap size mapping like channel1->size1,channel2->size2...
+   * @param additionalURL adding some additional file url like the form of dataSizeMap
+   * @return new Mapping
+   */
   def addAddtionalHDFSFile(dataSizeMap: HashMap[String, Long], additionalURL: String): HashMap[String, Long] = {
     val lines = Source.fromFile(additionalURL).getLines().toList
     for (line <- lines) {
@@ -95,7 +147,7 @@ class SizeComputation(newAddedHDFSSizeURL: String, topicNum: Int, boltNum: Int) 
       val value = ss(0).toLong >> 20
       dataSizeMap(key) += value
     }
-    println("Summed size: " + dataSizeMap.values.sum + "\n")
+    logger.info("Summed size: " + dataSizeMap.values.sum + "\n")
     dataSizeMap
   }
 
@@ -104,14 +156,13 @@ class SizeComputation(newAddedHDFSSizeURL: String, topicNum: Int, boltNum: Int) 
 }
 
 object SizeComputation extends App {
-  val topicInfos = new TopicDescription("/Application/nla/log_pick/conf/test/testfile")
-  val map = topicInfos.readFromFile();
-
-  val sc = new SizeComputation("/Application/nla/log_pick/conf/test/size.out", 300, 100)
+  val url="/Application/nla/log_pick/conf/test/size.out";
+  val sc = new SizeComputation(url, 300, 100)
   val sizeMap = sc.readHDFSSize(new HashMap[String, Long])
-
-
+  val mappinglist=sc.startAssignment(sizeMap)
+  sc.writeToFile(mappinglist,url+".topicmapping");
   val boundaries = sc.satasticSizeInfo;
+
   //  if(!topicInfos.topicMapping.isEmpty)
   //    sc.rebalance(topicInfos.topicMapping)
 
