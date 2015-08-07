@@ -5,7 +5,7 @@ import scala.collection.mutable.ArrayBuffer
 /**
  * Created by robinmac on 15-8-4.
  */
-class BasicSlot(slotid:Long) {
+abstract class BasicSlot(val slotid:Long) {
   /**
    * The form like this
    *
@@ -14,17 +14,22 @@ class BasicSlot(slotid:Long) {
    */
   val channelList=new ArrayBuffer[(String,Long)]
 
-  def transformToTopicMap():Iterable[(String,Long)] = channelList.map(_._1->slotid)
+  def transformToMap(reflectid:Long=slotid):Iterable[(String,Long)] = channelList.map(_._1->reflectid)
 
-  def getDataSize():Long = channelList.map(_._2).sum
-
-
-  override def toString = "[slotid]:"+slotid+" [ChannelNums]:"+channelList.size+" [DataSize]: "+getDataSize()
+  def getDataSize= channelList.map(_._2).sum
+  def getChannelNum=channelList.size
 }
 
-class TopicSlot(slotid:Long) extends BasicSlot(slotid:Long){
+class TopicSlot(slotid:Long,val batchType:Int) extends BasicSlot(slotid:Long){
+  override def toString = "[Type]:"+batchType+"\t[Slotid]:"+slotid+"\t[ChannelNums]:"+channelList.size+"\t[DataSize]: "+getDataSize
+  var boltid=0l;
 }
 
 class BoltSlot(slotid:Long) extends BasicSlot(slotid:Long){
+  val tsList=new ArrayBuffer[TopicSlot]
+
+  override def getDataSize=tsList.map(_.getDataSize).sum
+
+  override def toString = "[BSlotid]:"+slotid+"\t[DataSize]: "+getDataSize+"\t[topicSlot Size:]:"+tsList.size
 
 }

@@ -6,32 +6,39 @@ import scala.collection.mutable.ArrayBuffer
  *
  * Created by robinmac on 15-8-4.
  */
-class Batch(infos: List[(String, Long)], slotNum: Long, startid: Long) {
-//  println( toString())
+class Batch(infos: List[(String, Long)], slotNum: Long, startid: Long, batchType:String) {
+  val bdescription=new BatchDescrition(batchType);
 
   override def toString: String =
-  "Batch: [" + startid + "~~" + (startid + slotNum - 1) + "]:\n"+
-  "Infos Num:"+infos.length+"\n"+
-  "Infos Weight: "+infos.map(_._2).sum/1024+"G\n\n"+
+  "\nBatch: [" + startid + "~~" + (startid + slotNum - 1) + "]\t [type]"+bdescription.typeNum+":\n"+
+  "Channel Num:"+infos.length+"\n"+
+  "Channel Size: "+infos.map(_._2).sum/1024+"G\n\n"+
     assignSlotsInBatchAndGet().map(b=>{
       b.toString+"\n"
     })
 
-  def assignSlotsInBatchAndGet(): ArrayBuffer[BasicSlot] = {
-    val slotList = new ArrayBuffer[BasicSlot]
+  /**
+   *
+   * @return
+   */
+  def assignSlotsInBatchAndGet(): ArrayBuffer[TopicSlot] = {
+    val slotList = new ArrayBuffer[TopicSlot]
     for (id <- startid to slotNum + startid - 1) {
-      slotList += new BasicSlot(id)
+      slotList += new TopicSlot(id,bdescription.typeNum)
     }
-    var k = 0
+    var k = new DispatchByW(0,slotList.size)
     var step = 1
     infos.sortWith((a,b)=>(a._2-b._2>0)).foreach(channel => {
-      slotList(k).channelList += channel
-      k += step
-      if (k == slotList.size || k == (-1)) {
-        step = (-step)
-        k = k + step
-      }
+      slotList(k.value).channelList += channel
+      k.change()
     })
     slotList
   }
+  class BatchDescrition(val batchType:String){
+    val ss:Array[String]=batchType.split(":");
+    val typeNum=ss(0).toInt
+    val channelNum=ss(1).toInt
+    val dataSizePSlot=ss(2).toInt
+  }
 }
+
